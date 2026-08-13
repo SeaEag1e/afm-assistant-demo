@@ -1,0 +1,34 @@
+# 原始知识库数据（含Bruker培训课程内容，不公开）
+shujuku/线上培训*.txt
+shujuku/Dimension Icon*.txt
+shujuku/ICON培训讲义.txt
+shujuku/NanoScope 安装.txt
+shujuku/*_images/
+
+# 图片资源（体积大，demo不需要）
+output/
+
+# Tesseract-OCR引擎（200MB+，云端不打包）
+Tesseract-OCR/
+
+# 打包临时文件
+build/
+*.spec
+*.rar
+
+# Python缓存
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 日志
+*.log
+install.log

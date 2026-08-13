@@ -1,0 +1,35 @@
+{
+  "quick_answers": [
+    {
+      "mode": "prepend",
+      "topic": "换针/更换探针",
+      "keywords": [
+        "换针", "换探针", "换针操作", "更换探针", "更换针尖", "需要换针",
+        "怎样换针", "怎么换针", "如何换针", "如何更换探针", "怎样更换针尖",
+        "新探针", "换针尖", "探针怎么换", "针怎么换",
+        "new probe", "new tip", "new needle", "change probe", "change the probe",
+        "need new tip", "need a new tip", "needle replacement",
+        "replace tip", "replace the tip", "changing the probe"
+      ],
+      "keyword_groups": [
+        ["探针", "换"],
+        ["探针", "更换"],
+        ["探针", "安装"],
+        ["探针", "装"],
+        ["针", "换"],
+        ["针", "更换"],
+        ["针尖", "换"],
+        ["tip", "change"],
+        ["probe", "change"],
+        ["needle", "change"],
+        ["tip", "replace"],
+        ["probe", "replace"],
+        ["换", "tip"],
+        ["换", "probe"],
+        ["换", "探针"],
+        ["probe", "install"],
+        ["探针", "install"]
+      ]
+    }
+  ]
+}

@@ -31,6 +31,9 @@ DATA_DIR = SCRIPT_DIR / "shujuku"
 OUTPUT_DIR = SCRIPT_DIR / "output"
 TOP_K = 5
 
+# 多个知识库搜索目录（云端 demo_knowledge_base.txt 可能在根目录）
+KNOWLEDGE_DIRS = [DATA_DIR, SCRIPT_DIR]
+
 # OCR配置
 def get_tesseract_path():
     candidates = [
@@ -79,7 +82,15 @@ class DocumentLoader:
     @staticmethod
     def load_all():
         documents = []
-        txt_files = list(DATA_DIR.glob("**/*.txt"))
+        seen_files = set()
+        txt_files = []
+        for kdir in KNOWLEDGE_DIRS:
+            if kdir.exists():
+                for f in kdir.glob("**/*.txt"):
+                    key = str(f.resolve())
+                    if key not in seen_files:
+                        seen_files.add(key)
+                        txt_files.append(f)
         
         for txt_file in txt_files:
             try:

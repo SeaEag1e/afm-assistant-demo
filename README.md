@@ -5,8 +5,8 @@
 ## 产品定位
 
 科研人员在使用 AFM（原子力显微镜）时面临两大痛点：
-1. **操作手册冗长** — Bruker Dimension Icon 中文手册 100+ 页，查找信息耗时
-2. **培训内容遗忘** — 线上培训课程 18 讲，需要反复回看
+1. **操作手册冗长** — 仪器手册通常上百页，查找信息耗时
+2. **培训内容遗忘** — 培训课程内容多，需要反复回看
 
 本系统通过 **RAG 技术 + GLM-4 大模型**，让科研人员用自然语言提问即可获得精准操作指导，将"翻手册"变成"问助手"。
 
@@ -40,18 +40,14 @@
 - Python 3.10+
 - Windows / macOS / Linux
 
-### 一键启动（Windows）
-1. 双击 `启动助手.bat`
-2. 浏览器自动打开 `http://localhost:8501`
-
-### 手动启动
+### 启动
 ```bash
 pip install -r requirements.txt
 streamlit run afm_rag_streamlit_image.py
 ```
 
 ### 访问密码
-默认密码：`afm2026`（可在代码中修改 `APP_PASSWORD` 变量）
+部署后请在代码中修改 `APP_PASSWORD` 变量为你自己的密码（默认值为 `change-me`，务必修改）。
 
 ## 云端部署（Streamlit Cloud）
 
@@ -67,17 +63,15 @@ streamlit run afm_rag_streamlit_image.py
 ```
 afm_rag_streamlit_image.py     # 主程序
 requirements.txt               # 依赖清单
-quick_answers.json             # 快捷回答规则
+quick_answers.json             # 快捷回答规则（安全提示）
+demo_knowledge_base.txt        # 脱敏示例知识库
 README.md                      # 项目说明
-shujuku/                       # 知识库目录
-  └── demo_knowledge_base.txt  # 脱敏知识库（16条）
 .streamlit/
   └── config.toml              # Streamlit配置
 .gitignore                     # Git忽略规则
-启动助手.bat                    # 本地启动脚本（可选）
 ```
 
-> **注意**：`shujuku/` 目录下的 `线上培训*.txt`、`Dimension Icon*.txt` 等原始培训数据已被 `.gitignore` 排除，不会上传。
+> **注意**：真实知识库文档（操作手册、培训讲义等）不包含在仓库中，已被 `.gitignore` 排除。仓库仅提供脱敏示例数据用于演示。
 
 ### Step 3：部署到 Streamlit Cloud
 1. 打开 [share.streamlit.io](https://share.streamlit.io/)
@@ -91,14 +85,14 @@ shujuku/                       # 知识库目录
    `https://afm-assistant-demo-xxx.streamlit.app`
 
 ### Step 4：分享
-将链接和访问密码（`afm2026`）发送给面试官即可。
+将链接和访问密码发送给面试官即可（密码请在代码中自行设置）。
 
 ## 知识库说明
 
 | 文件 | 内容 | 说明 |
 |------|------|------|
-| `shujuku/demo_knowledge_base.txt` | AFM 通用知识（16条） | 脱敏示例数据，可公开演示 |
-| `shujuku/线上培训*.txt` | 仪器培训资料 | 原始知识库（已通过 .gitignore 排除） |
+| `demo_knowledge_base.txt` | AFM 通用知识 | 脱敏示例数据，可公开演示 |
+| `shujuku/*.txt` | 用户自行放入的真实文档 | 原始知识库（已通过 .gitignore 排除，不上传） |
 
 知识库格式为 JSON 数组：
 ```json
@@ -125,13 +119,12 @@ shujuku/                       # 知识库目录
 AFM仪器助手/
 ├── afm_rag_streamlit_image.py   # 主程序
 ├── requirements.txt              # 依赖清单
-├── 启动助手.bat                   # 一键启动脚本（Windows）
-├── quick_answers.json            # 快捷回答规则
+├── quick_answers.json            # 快捷回答规则（安全提示）
+├── demo_knowledge_base.txt       # 脱敏示例知识库
 ├── .gitignore                    # Git忽略规则
 ├── .streamlit/
 │   └── config.toml               # Streamlit配置
-├── shujuku/                      # 知识库目录
-│   └── demo_knowledge_base.txt   # 脱敏示例数据（16条）
+├── shujuku/                      # 真实知识库目录（用户自备，不上传）
 ├── output/                       # 图片资源（本地，不上传）
 └── Tesseract-OCR/                # OCR引擎（本地，不上传）
 ```

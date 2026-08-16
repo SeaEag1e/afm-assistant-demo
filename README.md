@@ -28,9 +28,9 @@ streamlit run afm_rag_streamlit_image.py
 
 ## 在线体验
 
-这个项目已经部署在 Streamlit Cloud 上，可以直接访问：
+演示地址：[afm-assistant-demo-agecyrmqjjx3xdnd5dnocu.streamlit.app](https://afm-assistant-demo-agecyrmqjjx3xdnd5dnocu.streamlit.app/)
 
-1. 打开部署链接（见仓库 About 或 README 顶部）
+1. 打开上面的链接
 2. 输入访问密码进入系统
 3. 在左侧边栏填入智谱 AI API Key 启用大模型回答（不填也可，不进行 LLM 优化）
 

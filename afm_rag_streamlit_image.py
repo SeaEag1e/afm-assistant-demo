@@ -834,42 +834,6 @@ def inject_css():
     """, unsafe_allow_html=True)
 
 
-# 访问密码（修改为你自己的密码，部署到云端后只有知道密码的人能访问）
-APP_PASSWORD = "afm2026"
-
-def check_password():
-    """密码登录验证"""
-    if "password_verified" not in st.session_state:
-        st.session_state["password_verified"] = False
-
-    if st.session_state["password_verified"]:
-        return True
-
-    # 登录页面
-    st.markdown("""
-    <div style="display:flex;justify-content:center;align-items:center;min-height:60vh;">
-        <div style="background:white;border-radius:20px;padding:40px 48px;box-shadow:0 8px 32px rgba(26,31,58,0.15);width:380px;text-align:center;">
-            <div style="font-size:3rem;margin-bottom:8px;">🔬</div>
-            <h2 style="font-size:1.4rem;color:#1a202c;margin:0 0 6px 0;">AFM 智能操作助手</h2>
-            <p style="color:#718096;font-size:0.85rem;margin:0 0 24px 0;">RAG + GLM-4 知识库问答系统</p>
-            <div style="border-top:1px solid #e2e8f0;margin:0 0 20px 0;"></div>
-            <p style="color:#4a5568;font-size:0.82rem;margin-bottom:12px;">请输入访问密码</p>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    col_login = st.columns([1, 2, 1])
-    with col_login[1]:
-        pwd = st.text_input("密码", type="password", placeholder="请输入访问密码", label_visibility="collapsed")
-        if st.button("🔒 进入系统", type="primary", use_container_width=True):
-            if pwd == APP_PASSWORD:
-                st.session_state["password_verified"] = True
-                st.rerun()
-            else:
-                st.error("密码错误，请重试")
-    return False
-
-
 def main():
     st.set_page_config(
         page_title="AFM智能助手 | RAG + GLM-4",
@@ -879,10 +843,6 @@ def main():
     )
 
     inject_css()
-
-    # ===== 密码保护 =====
-    if not check_password():
-        st.stop()
 
     # ===== Hero区域 =====
     st.markdown("""

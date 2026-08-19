@@ -610,6 +610,79 @@ class AFMRAGSystem:
 ## 你的回答
 """
 
+# ==================== 安全操作确认弹窗 ====================
+@st.dialog("⚠️ 高危操作安全警告", width="large")
+def show_safety_dialog(rule, question, callback='chat'):
+    """高危操作确认弹窗：用户确认后才显示具体操作步骤
+    callback: 'chat'=结果入对话历史 | 'faq'=结果存last_faq_result | 'image'=结果存last_image_result
+    """
+    warning = rule.get('warning', '')
+    footer = rule.get('footer', '')
+    topic = rule.get('topic', '')
+
+    # 自动生成模板（与 AFMRAGSystem.query() 中的逻辑一致）
+    if topic and not warning:
+        warning = f"⚠️ 【重要提示】关于**{topic}**，**建议先联系老师或实验室管理员**。"
+    if topic and not footer:
+        footer = f"⚠️ 请注意：**自行进行{topic}操作可能导致仪器损坏或影响数据精度，需自行承担相应责任。** 建议在老师指导下进行操作。"
+
+    st.error("⚠️ 即将查询的操作存在安全风险，请仔细阅读以下提示：")
+    st.markdown("")
+    if warning:
+        st.warning(warning)
+    if footer:
+        st.warning(footer)
+    st.markdown("---")
+    st.info("💡 点击「我已了解风险，继续查看」后将显示具体操作步骤；点击「取消」则不会显示。")
+
+    col_yes, col_no = st.columns(2)
+    with col_yes:
+        if st.button("✅ 我已了解风险，继续查看", type="primary", use_container_width=True):
+            st.session_state['safety_confirmed_question'] = question
+            st.session_state['safety_confirmed_callback'] = callback
+            st.session_state['pending_safety_question'] = None
+            st.rerun()
+    with col_no:
+        if st.button("❌ 取消", use_container_width=True):
+            st.session_state['pending_safety_question'] = None
+            st.session_state['pending_safety_callback'] = None
+            st.rerun()
+
+
+def submit_question(question, api_key, use_llm, context_mode):
+    """提交问题统一入口：先检查高危操作规则，命中则弹窗拦截，否则直接查询并入历史"""
+    q = question.strip() if question else ""
+    if not q:
+        return
+    # 命中高危操作（prepend 模式）→ 拦截，弹窗确认
+    rule, _ = QuickAnswerLoader.check(q)
+    if rule and rule.get('mode', 'only') == 'prepend':
+        st.session_state['pending_safety_question'] = q
+        st.session_state['pending_safety_callback'] = 'chat'
+        st.rerun()
+    # 正常查询
+    rag_system = st.session_state.get('rag_system')
+    if not rag_system:
+        return
+    context = ""
+    if context_mode and st.session_state.get('conversation_history'):
+        recent = st.session_state['conversation_history'][-5:]
+        context = "\n\n".join([
+            f"用户: {qq}\n助手: {a}"
+            for qq, a, _, _ in recent
+        ])
+    with st.spinner("🔍 正在检索知识库并生成回答..."):
+        answer, sources, from_database, images = rag_system.query(
+            q, api_key, use_llm, context=context
+        )
+        st.session_state['conversation_history'].append(
+            (q, answer, from_database, sources)
+        )
+        if len(st.session_state['conversation_history']) > 50:
+            st.session_state['conversation_history'] = st.session_state['conversation_history'][-50:]
+    st.rerun()
+
+
 # ==================== 主界面 ====================
 def inject_css():
     """注入专业级CSS主题"""
@@ -942,7 +1015,56 @@ def main():
         st.session_state['conversation_history'] = []
     if 'zhipu_history' not in st.session_state:
         st.session_state['zhipu_history'] = []
-    
+    # 安全弹窗状态：pending_safety_question=待确认的高危问题；safety_confirmed_question=已确认待查询的问题
+    if 'pending_safety_question' not in st.session_state:
+        st.session_state['pending_safety_question'] = None
+    if 'pending_safety_callback' not in st.session_state:
+        st.session_state['pending_safety_callback'] = 'chat'
+    if 'safety_confirmed_question' not in st.session_state:
+        st.session_state['safety_confirmed_question'] = None
+    if 'safety_confirmed_callback' not in st.session_state:
+        st.session_state['safety_confirmed_callback'] = 'chat'
+    if 'last_query_result' not in st.session_state:
+        st.session_state['last_query_result'] = None
+
+    # ===== 安全弹窗：已确认的高危问题，立即执行查询 =====
+    if st.session_state.get('safety_confirmed_question'):
+        q = st.session_state['safety_confirmed_question']
+        callback = st.session_state.get('safety_confirmed_callback', 'chat')
+        st.session_state['safety_confirmed_question'] = None
+        st.session_state['safety_confirmed_callback'] = None
+
+        with st.spinner("🔍 正在检索知识库并生成回答..."):
+            if callback == 'chat':
+                context = ""
+                if st.session_state.get('conversation_history'):
+                    recent = st.session_state['conversation_history'][-5:]
+                    context = "\n\n".join([
+                        f"用户: {qq}\n助手: {a}"
+                        for qq, a, _, _ in recent
+                    ])
+                answer, sources, from_database, images = rag_system.query(
+                    q, api_key, use_llm, context=context
+                )
+                st.session_state['conversation_history'].append(
+                    (q, answer, from_database, sources)
+                )
+            else:
+                # faq / image：结果暂存，由对应 tab 渲染
+                answer, sources, from_database, images = rag_system.query(
+                    q, api_key, use_llm
+                )
+                st.session_state['last_query_result'] = (q, answer, sources, from_database, images)
+        st.rerun()
+
+    # ===== 安全弹窗：显示待确认的高危操作警告（拦截查询，直到用户确认） =====
+    if st.session_state.get('pending_safety_question'):
+        q = st.session_state['pending_safety_question']
+        rule, _ = QuickAnswerLoader.check(q)
+        if rule:
+            callback = st.session_state.get('pending_safety_callback', 'chat')
+            show_safety_dialog(rule, q, callback)
+
     # 标签页
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "💬 智能问答",
@@ -1013,21 +1135,7 @@ def main():
         ]
         for i, q in enumerate(quick_questions):
             if quick_cols[i].button(q, key=f"qq_{i}", use_container_width=True):
-                context = ""
-                if context_mode and st.session_state['conversation_history']:
-                    recent = st.session_state['conversation_history'][-5:]
-                    context = "\n\n".join([
-                        f"用户: {qq}\n助手: {a}"
-                        for qq, a, _, _ in recent
-                    ])
-                with st.spinner("🔍 正在检索知识库并生成回答..."):
-                    answer, sources, from_database, images = rag_system.query(
-                        q, api_key, use_llm, context=context
-                    )
-                    st.session_state['conversation_history'].append(
-                        (q, answer, from_database, sources)
-                    )
-                    st.rerun()
+                submit_question(q, api_key, use_llm, context_mode)
 
         # 输入区
         st.markdown("<div style='margin-top:12px;margin-bottom:4px;color:#4a5568;font-size:0.85rem;font-weight:500;'>✍️ 输入你的问题</div>", unsafe_allow_html=True)
@@ -1047,28 +1155,7 @@ def main():
 
         if send_clicked:
             if question and question.strip():
-                with st.spinner("🔍 正在检索知识库并生成回答..."):
-                    # 构建上下文
-                    context = ""
-                    if context_mode and st.session_state['conversation_history']:
-                        recent = st.session_state['conversation_history'][-5:]
-                        context = "\n\n".join([
-                            f"用户: {q}\n助手: {a}"
-                            for q, a, _, _ in recent
-                        ])
-
-                    answer, sources, from_database, images = rag_system.query(
-                        question.strip(), api_key, use_llm, context=context
-                    )
-
-                    # 加入历史
-                    st.session_state['conversation_history'].append(
-                        (question.strip(), answer, from_database, sources)
-                    )
-                    if len(st.session_state['conversation_history']) > 50:
-                        st.session_state['conversation_history'] = st.session_state['conversation_history'][-50:]
-
-                    st.rerun()
+                submit_question(question, api_key, use_llm, context_mode)
             else:
                 st.warning("请先输入问题内容")
     
@@ -1116,27 +1203,40 @@ def main():
                 # 根据OCR结果搜索
                 if ocr_text and ocr_text.strip():
                     st.markdown("<hr class='custom-divider'>", unsafe_allow_html=True)
+
+                    # 显示上次查询结果（含安全确认后的结果）
+                    if st.session_state.get('last_query_result'):
+                        q, answer, sources, from_database, images = st.session_state['last_query_result']
+                        st.markdown("<div style='margin-top:12px;margin-bottom:4px;color:#4a5568;font-size:0.85rem;font-weight:500;'>🤖 AI 回答</div>", unsafe_allow_html=True)
+                        st.markdown(answer)
+
+                        if from_database:
+                            st.success("✅ 回答来自知识库")
+
+                        if sources:
+                            with st.expander(f"📚 参考来源（{len(sources)}）"):
+                                for source in sources:
+                                    st.text(source)
+
+                        if images:
+                            st.markdown("<div style='margin-top:12px;margin-bottom:4px;color:#4a5568;font-size:0.85rem;font-weight:500;'>🖼️ 相关图片</div>", unsafe_allow_html=True)
+                            cols = st.columns(3)
+                            for i, img_path in enumerate(images[:3]):
+                                with cols[i]:
+                                    st.image(img_path, caption=os.path.basename(img_path), use_column_width=True)
+
                     if st.button("🔍 根据图片内容搜索知识库", type="primary", use_container_width=True):
+                        # 命中高危操作 → 弹窗拦截
+                        rule, _ = QuickAnswerLoader.check(ocr_text)
+                        if rule and rule.get('mode', 'only') == 'prepend':
+                            st.session_state['pending_safety_question'] = ocr_text
+                            st.session_state['pending_safety_callback'] = 'image'
+                            st.rerun()
+                        # 正常查询
                         with st.spinner("正在检索..."):
                             answer, sources, from_database, images = rag_system.query(ocr_text, api_key, use_llm)
-
-                            st.markdown("<div style='margin-top:12px;margin-bottom:4px;color:#4a5568;font-size:0.85rem;font-weight:500;'>🤖 AI 回答</div>", unsafe_allow_html=True)
-                            st.markdown(answer)
-
-                            if from_database:
-                                st.success("✅ 回答来自知识库")
-
-                            if sources:
-                                with st.expander(f"📚 参考来源（{len(sources)}）"):
-                                    for source in sources:
-                                        st.text(source)
-
-                            if images:
-                                st.markdown("<div style='margin-top:12px;margin-bottom:4px;color:#4a5568;font-size:0.85rem;font-weight:500;'>🖼️ 相关图片</div>", unsafe_allow_html=True)
-                                cols = st.columns(3)
-                                for i, img_path in enumerate(images[:3]):
-                                    with cols[i]:
-                                        st.image(img_path, caption=os.path.basename(img_path), use_column_width=True)
+                            st.session_state['last_query_result'] = (ocr_text, answer, sources, from_database, images)
+                        st.rerun()
     
     # 图片库
     with tab3:
@@ -1201,33 +1301,45 @@ def main():
             "AFM基本原理"
         ]
 
+        # 显示上次查询结果（含安全确认后的结果）
+        if st.session_state.get('last_query_result'):
+            q, answer, sources, from_database, images = st.session_state['last_query_result']
+            st.markdown("<hr class='custom-divider'>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-weight:600;color:#2d3748;margin-bottom:8px;'>❓ {q}</div>", unsafe_allow_html=True)
+            st.markdown(answer)
+
+            badge_cls = "source-ok" if from_database else "source-warn"
+            badge_text = "✅ 来自知识库" if from_database else "⚠️ 知识库未匹配"
+            st.markdown(f"<span class='source-badge {badge_cls}'>{badge_text}</span>", unsafe_allow_html=True)
+
+            if sources:
+                with st.expander(f"📚 参考来源（{len(sources)}）"):
+                    for source in sources:
+                        st.text(source)
+
+            if images:
+                st.markdown("<div style='margin-top:12px;margin-bottom:4px;color:#4a5568;font-size:0.85rem;font-weight:500;'>🖼️ 相关图片</div>", unsafe_allow_html=True)
+                cols = st.columns(3)
+                for j, img_path in enumerate(images[:3]):
+                    with cols[j]:
+                        st.image(img_path, caption=os.path.basename(img_path), use_column_width=True)
+
         # 两列布局
         faq_cols = st.columns(2)
         for i, q in enumerate(faq_questions):
             with faq_cols[i % 2]:
                 if st.button(q, key=q, use_container_width=True):
+                    # 命中高危操作 → 弹窗拦截
+                    rule, _ = QuickAnswerLoader.check(q)
+                    if rule and rule.get('mode', 'only') == 'prepend':
+                        st.session_state['pending_safety_question'] = q
+                        st.session_state['pending_safety_callback'] = 'faq'
+                        st.rerun()
+                    # 正常查询
                     with st.spinner("正在检索..."):
                         answer, sources, from_database, images = rag_system.query(q, api_key, use_llm)
-
-                        st.markdown("<hr class='custom-divider'>", unsafe_allow_html=True)
-                        st.markdown(f"<div style='font-weight:600;color:#2d3748;margin-bottom:8px;'>❓ {q}</div>", unsafe_allow_html=True)
-                        st.markdown(answer)
-
-                        badge_cls = "source-ok" if from_database else "source-warn"
-                        badge_text = "✅ 来自知识库" if from_database else "⚠️ 知识库未匹配"
-                        st.markdown(f"<span class='source-badge {badge_cls}'>{badge_text}</span>", unsafe_allow_html=True)
-
-                        if sources:
-                            with st.expander(f"📚 参考来源（{len(sources)}）"):
-                                for source in sources:
-                                    st.text(source)
-
-                        if images:
-                            st.markdown("<div style='margin-top:12px;margin-bottom:4px;color:#4a5568;font-size:0.85rem;font-weight:500;'>🖼️ 相关图片</div>", unsafe_allow_html=True)
-                            cols = st.columns(3)
-                            for j, img_path in enumerate(images[:3]):
-                                with cols[j]:
-                                    st.image(img_path, caption=os.path.basename(img_path), use_column_width=True)
+                        st.session_state['last_query_result'] = (q, answer, sources, from_database, images)
+                    st.rerun()
 
     # 知识管理
     with tab5:

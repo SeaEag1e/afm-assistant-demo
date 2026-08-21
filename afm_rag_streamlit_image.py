@@ -93,6 +93,9 @@ class DocumentLoader:
                         txt_files.append(f)
         
         for txt_file in txt_files:
+            # 跳过非知识库文件（requirements.txt 等配置文件）
+            if txt_file.name.lower() in ('requirements.txt', 'readme.txt', 'license.txt'):
+                continue
             try:
                 with open(txt_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
@@ -100,8 +103,9 @@ class DocumentLoader:
                     documents.extend(data)
                 else:
                     documents.append(data)
-            except Exception as e:
-                st.warning(f"加载文件失败 {txt_file}: {str(e)}")
+            except Exception:
+                # 非 JSON 格式的 .txt 文件静默跳过，不污染界面
+                pass
         
         return documents
 
@@ -959,7 +963,8 @@ def main():
             <div class="metric-label">驱动大模型</div>
         </div>""", unsafe_allow_html=True)
     with m4:
-        llm_status = "<span class='status-dot status-online'></span>已启用" if True else "<span class='status-dot status-offline'></span>未启用"
+        _has_key = bool(st.session_state.get('api_key_input'))
+        llm_status = "<span class='status-dot status-online'></span>已启用" if _has_key else "<span class='status-dot status-offline'></span>未启用"
         st.markdown(f"""<div class="metric-card">
             <div class="metric-icon">🤖</div>
             <div class="metric-value" style="font-size:1.3rem;">AI 增强</div>
@@ -977,7 +982,8 @@ def main():
                 "智谱AI API Key",
                 type="password",
                 placeholder="sk-xxxxxxxxxxxxxxxxxx",
-                help="在 [智谱开放平台](https://open.bigmodel.cn/) 获取"
+                help="在 [智谱开放平台](https://open.bigmodel.cn/) 获取",
+                key="api_key_input"
             )
             use_llm = st.checkbox("启用 GLM-4 优化回答", value=True)
 
